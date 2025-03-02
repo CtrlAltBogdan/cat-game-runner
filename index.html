@@ -6,10 +6,16 @@
     <title>Space Dodger</title>
     <link rel="stylesheet" href="./css/style.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+    <script src="./js/preloader.js"></script>
   </head>
   <body>
+    <!-- Окно загрузки -->
+    <div id="loading-screen" class="loading-screen">
+      <p>Loading...</p>
+    </div>
+
     <!-- Начальное меню с кнопкой "Play" -->
-    <div class="menu-container" id="menu-container">
+    <div class="menu-container" id="menu-container" style="display: none">
       <button id="play-button" class="play-b"></button>
     </div>
 

@@ -222,3 +222,19 @@ button {
 #player {
     animation: pulse 1.5s infinite ease-in-out;
 }
+
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    font-family: "Pixelify Sans";
+    font-size: 24px;
+}

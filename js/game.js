@@ -777,5 +777,24 @@ document.addEventListener("DOMContentLoaded", () => {
     initAudioOnUserInteraction();
     resetGame();
   });
-  setupControls();
+
+  // Убедимся, что игра начинается только после загрузки всех ресурсов
+  const loadingScreen = document.getElementById("loading-screen");
+  const menuContainer = document.getElementById("menu-container");
+
+  if (loadingScreen.style.display === "none") {
+    setupControls();
+  } else {
+    const observer = new MutationObserver(() => {
+      if (loadingScreen.style.display === "none") {
+        setupControls();
+        observer.disconnect();
+      }
+    });
+
+    observer.observe(loadingScreen, {
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+  }
 });

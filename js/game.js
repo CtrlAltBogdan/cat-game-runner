@@ -1,6 +1,6 @@
 // Регистрация Service Worker для кеширования ресурсов
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("js/sw.js").catch((err) => {
+  navigator.serviceWorker.register("./js/sw.js").catch((err) => {
     console.error("Ошибка регистрации Service Worker:", err);
   });
 }
@@ -80,62 +80,162 @@ document.addEventListener("DOMContentLoaded", () => {
     ],
   };
 
-  // Инициализация звуков
-  const sounds = {
-    background: new Audio("../sounds/sound-play.mp3"),
-    death: new Audio("../sounds/death-sound.mp3"),
-    deathFinal: new Audio("../sounds/death-sound-2.mp3"),
-    coin: new Audio("../sounds/coins.mp3"),
-    countdown: {
-      three: new Audio("../sounds/go-1.mp3"),
-      two: new Audio("../sounds/go-2.mp3"),
-      one: new Audio("../sounds/go-3.mp3"),
-      go: new Audio("../sounds/go-start.mp3"),
+  // Аудио менеджер для кросс-платформенного воспроизведения
+  const audioManager = {
+    context: null,
+    sounds: {},
+    initialized: false,
+
+    init() {
+      // Создаем аудио контекст с учетом разных браузеров
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        this.context = new AudioContext();
+      }
+    },
+
+    // Загрузка всех звуков
+    async loadSounds() {
+      const soundsList = {
+        background: "../sounds/sound-play.mp3",
+        death: "../sounds/death-sound.mp3",
+        deathFinal: "../sounds/death-sound-2.mp3",
+        coin: "../sounds/coins.mp3",
+        countdown3: "../sounds/go-1.mp3",
+        countdown2: "../sounds/go-2.mp3",
+        countdown1: "../sounds/go-3.mp3",
+        countdownGo: "../sounds/go-start.mp3",
+      };
+
+      try {
+        const loadPromises = Object.entries(soundsList).map(
+          async ([key, url]) => {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+            this.sounds[key] = audioBuffer;
+          }
+        );
+
+        await Promise.all(loadPromises);
+        this.initialized = true;
+      } catch (error) {
+        console.error("Ошибка загрузки звуков:", error);
+      }
+    },
+
+    // Воспроизведение звука
+    play(soundName, { loop = false, volume = 1.0 } = {}) {
+      if (!this.initialized || !this.context || !this.sounds[soundName])
+        return null;
+
+      const source = this.context.createBufferSource();
+      const gainNode = this.context.createGain();
+
+      source.buffer = this.sounds[soundName];
+      source.loop = loop;
+
+      gainNode.gain.value = volume;
+      source.connect(gainNode);
+      gainNode.connect(this.context.destination);
+
+      source.start(0);
+      return { source, gainNode };
+    },
+
+    // Плавное изменение громкости
+    fade(gainNode, from, to, duration) {
+      if (!gainNode) return;
+      const now = this.context.currentTime;
+      gainNode.gain.setValueAtTime(from, now);
+      gainNode.gain.linearRampToValueAtTime(to, now + duration);
     },
   };
 
-  // Настройка звуков
-  function initializeSounds() {
-    sounds.background.loop = true;
-    sounds.background.volume = 0;
-
-    // Настройка громкости для всех звуков отсчёта
-    Object.values(sounds.countdown).forEach((sound) => {
-      sound.volume = 0.7;
-    });
-
-    sounds.death.volume = 1.0;
-    sounds.deathFinal.volume = 1.0;
-    sounds.coin.volume = 0.6;
+  // Инициализация звуков при первом взаимодействии пользователя
+  function initAudioOnUserInteraction() {
+    if (!audioManager.initialized) {
+      audioManager.init();
+      audioManager.loadSounds().then(() => {
+        console.log("Звуки загружены");
+      });
+    }
   }
 
-  // Управление фоновой музыкой
+  // Модифицируем функцию воспроизведения фоновой музыки
   const musicController = {
-    fadeIn() {
-      let volume = 0;
-      const fadeInterval = setInterval(() => {
-        if (volume < 0.5) {
-          volume += 0.05;
-          sounds.background.volume = volume;
-        } else {
-          sounds.background.volume = 0.5;
-          clearInterval(fadeInterval);
-        }
-      }, 100);
+    currentMusic: null,
+
+    async playBackground() {
+      if (this.currentMusic) {
+        this.currentMusic.source.stop();
+      }
+      this.currentMusic = audioManager.play("background", {
+        loop: true,
+        volume: 0,
+      });
+      if (this.currentMusic) {
+        audioManager.fade(this.currentMusic.gainNode, 0, 0.5, 1.0);
+      }
     },
 
     fadeOut() {
-      const fadeInterval = setInterval(() => {
-        if (sounds.background.volume > 0.1) {
-          sounds.background.volume -= 0.1;
-        } else {
-          sounds.background.volume = 0;
-          sounds.background.pause();
-          clearInterval(fadeInterval);
-        }
-      }, 100);
+      if (this.currentMusic) {
+        audioManager.fade(this.currentMusic.gainNode, 0.5, 0, 0.5);
+        setTimeout(() => {
+          if (this.currentMusic?.source) {
+            this.currentMusic.source.stop();
+          }
+        }, 500);
+      }
     },
   };
+
+  // Модифицируем функцию воспроизведения звука сбора монет
+  function playCollectSound() {
+    audioManager.play("coin", { volume: 0.6 });
+  }
+
+  // Модифицируем функцию воспроизведения звуков отсчета
+  function playCountdownSound(count) {
+    const soundMap = {
+      0: "countdown3",
+      1: "countdown2",
+      2: "countdown1",
+      3: "countdownGo",
+    };
+    audioManager.play(soundMap[count], { volume: 0.7 });
+  }
+
+  // Обновляем обработчики кнопок
+  elements.playButton.addEventListener("click", () => {
+    initAudioOnUserInteraction();
+    startGame();
+  });
+
+  elements.playAgainButton.addEventListener("click", () => {
+    initAudioOnUserInteraction();
+    resetGame();
+  });
+
+  // Обновляем функцию проигрывания звуков смерти
+  function playDeathSoundMultipleTimes(times = 3) {
+    let playCount = 0;
+
+    function playNextSound() {
+      if (playCount < times) {
+        audioManager.play("death", { volume: 1.0 });
+        playCount++;
+        setTimeout(playNextSound, 300);
+      } else if (playCount === times) {
+        setTimeout(() => {
+          audioManager.play("deathFinal", { volume: 1.0 });
+        }, 300);
+      }
+    }
+
+    playNextSound();
+  }
 
   // Функция отсчёта перед началом игры
   function playCountdown(callback) {
@@ -206,14 +306,6 @@ document.addEventListener("DOMContentLoaded", () => {
     ui.container.appendChild(img);
   }
 
-  // Проигрывание звука отсчёта
-  function playCountdownSound(count) {
-    const soundKey = ["three", "two", "one", "go"][count];
-    const sound = sounds.countdown[soundKey];
-    sound.currentTime = 0;
-    sound.play().catch(console.error);
-  }
-
   // Анимация окончания отсчёта
   function animateCountdownEnd(ui, callback) {
     ui.container.style.transition = "transform 0.5s ease-in-out";
@@ -257,9 +349,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Инициализация игровой сессии
   function initializeGameSession() {
-    sounds.background.currentTime = 0;
-    sounds.background.play().catch(console.error);
-    musicController.fadeIn();
+    musicController.playBackground();
 
     clearAllIntervals();
     startGameLoops();
@@ -294,17 +384,9 @@ document.addEventListener("DOMContentLoaded", () => {
     clearAllObjects();
 
     // Сброс состояния всех звуков
-    sounds.background.pause();
-    sounds.background.currentTime = 0;
-    sounds.death.pause();
-    sounds.death.currentTime = 0;
-    sounds.deathFinal.pause();
-    sounds.deathFinal.currentTime = 0;
-
-    // Восстановление начальной громкости
-    sounds.background.volume = 0.5;
-    sounds.death.volume = 1.0;
-    sounds.deathFinal.volume = 1.0;
+    if (musicController.currentMusic?.source) {
+      musicController.currentMusic.source.stop();
+    }
 
     // Очищаем все изображения взрывов
     const explosionImages = elements.gameContainer.querySelectorAll("img");
@@ -422,9 +504,7 @@ document.addEventListener("DOMContentLoaded", () => {
         score++;
         object.remove();
         // Воспроизводим звук монеты при сборе космонавта
-        const coinSoundInstance = new Audio(sounds.coin.src);
-        coinSoundInstance.volume = sounds.coin.volume;
-        coinSoundInstance.play();
+        playCollectSound();
       }
     }
   }
@@ -571,31 +651,6 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-  // Проигрывание звука смерти несколько раз
-  function playDeathSoundMultipleTimes(times = 3) {
-    let playCount = 0;
-
-    function playNextSound() {
-      if (playCount < times) {
-        const soundInstance = new Audio(sounds.death.src);
-        soundInstance.volume = 1.0;
-        soundInstance.playbackRate = 1.0;
-        soundInstance.play();
-        playCount++;
-
-        // Синхронизируем интервал звуков с интервалом анимации
-        setTimeout(playNextSound, 300);
-      } else if (playCount === times) {
-        setTimeout(() => {
-          sounds.deathFinal.currentTime = 0;
-          sounds.deathFinal.play();
-        }, 300); // Теперь финальный звук также синхронизирован с анимацией
-      }
-    }
-
-    playNextSound();
-  }
-
   // Настройка управления
   function setupControls() {
     elements.gameContainer.tabIndex = 0;
@@ -670,8 +725,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Инициализация игры
-  initializeSounds();
-  elements.playButton.addEventListener("click", startGame);
-  elements.playAgainButton.addEventListener("click", resetGame);
+  elements.playButton.addEventListener("click", () => {
+    initAudioOnUserInteraction();
+    startGame();
+  });
+  elements.playAgainButton.addEventListener("click", () => {
+    initAudioOnUserInteraction();
+    resetGame();
+  });
   setupControls();
 });

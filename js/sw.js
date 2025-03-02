@@ -1,5 +1,6 @@
 const CACHE_NAME = "game-cache-v1";
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 часа в миллисекундах
+const CACHE_ENABLED = false; // Включение/отключение кеширования
 
 const assetsToCache = [
   // Звуки
@@ -28,12 +29,20 @@ const assetsToCache = [
 ];
 
 self.addEventListener("install", (event) => {
+  if (!CACHE_ENABLED) {
+    return;
+  }
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(assetsToCache))
   );
 });
 
 self.addEventListener("fetch", (event) => {
+  if (!CACHE_ENABLED) {
+    return event.respondWith(fetch(event.request));
+  }
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {

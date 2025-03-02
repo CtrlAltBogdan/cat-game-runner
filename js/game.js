@@ -80,123 +80,167 @@ document.addEventListener("DOMContentLoaded", () => {
     ],
   };
 
-  // Аудио менеджер для кросс-платформенного воспроизведения
+  // аудио менеджер с использованием Howler.js
   const audioManager = {
-    context: null,
     sounds: {},
     initialized: false,
 
     init() {
-      // Создаем аудио контекст с учетом разных браузеров
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        this.context = new AudioContext();
+      try {
+        this.initializeAudio();
+        this.initialized = true;
+      } catch (e) {
+        console.error("Ошибка инициализации аудио:", e);
       }
     },
 
-    // Загрузка всех звуков
-    async loadSounds() {
+    initializeAudio() {
       const soundsList = {
-        background: "../sounds/sound-play.mp3",
-        death: "../sounds/death-sound.mp3",
-        deathFinal: "../sounds/death-sound-2.mp3",
-        coin: "../sounds/coins.mp3",
-        countdown3: "../sounds/go-1.mp3",
-        countdown2: "../sounds/go-2.mp3",
-        countdown1: "../sounds/go-3.mp3",
-        countdownGo: "../sounds/go-start.mp3",
+        background: "./sounds/sound-play.mp3",
+        death: "./sounds/death-sound.mp3",
+        deathFinal: "./sounds/death-sound-2.mp3",
+        coin: "./sounds/coins.mp3",
+        countdown3: "./sounds/go-1.mp3",
+        countdown2: "./sounds/go-2.mp3",
+        countdown1: "./sounds/go-3.mp3",
+        countdownGo: "./sounds/go-start.mp3",
       };
 
-      try {
-        const loadPromises = Object.entries(soundsList).map(
-          async ([key, url]) => {
-            const response = await fetch(url);
-            const arrayBuffer = await response.arrayBuffer();
-            const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-            this.sounds[key] = audioBuffer;
-          }
-        );
+      Object.entries(soundsList).forEach(([key, url]) => {
+        this.sounds[key] = new Howl({
+          src: [url],
+          preload: true,
+        });
+      });
+    },
 
-        await Promise.all(loadPromises);
-        this.initialized = true;
-      } catch (error) {
-        console.error("Ошибка загрузки звуков:", error);
+    play(soundName, { loop = false, volume = 1.0 } = {}) {
+      try {
+        const sound = this.sounds[soundName];
+        if (!sound) return null;
+
+        sound.loop(loop);
+        sound.volume(volume);
+        sound.play();
+
+        return {
+          stop: () => sound.stop(),
+          setVolume: (value) => sound.volume(value),
+        };
+      } catch (e) {
+        console.warn(`Ошибка воспроизведения звука ${soundName}:`, e);
+        return null;
       }
     },
 
-    // Воспроизведение звука
-    play(soundName, { loop = false, volume = 1.0 } = {}) {
-      if (!this.initialized || !this.context || !this.sounds[soundName])
-        return null;
-
-      const source = this.context.createBufferSource();
-      const gainNode = this.context.createGain();
-
-      source.buffer = this.sounds[soundName];
-      source.loop = loop;
-
-      gainNode.gain.value = volume;
-      source.connect(gainNode);
-      gainNode.connect(this.context.destination);
-
-      source.start(0);
-      return { source, gainNode };
-    },
-
-    // Плавное изменение громкости
-    fade(gainNode, from, to, duration) {
-      if (!gainNode) return;
-      const now = this.context.currentTime;
-      gainNode.gain.setValueAtTime(from, now);
-      gainNode.gain.linearRampToValueAtTime(to, now + duration);
+    stopAll() {
+      Object.values(this.sounds).forEach((sound) => sound.stop());
     },
   };
 
-  // Инициализация звуков при первом взаимодействии пользователя
-  function initAudioOnUserInteraction() {
-    if (!audioManager.initialized) {
-      audioManager.init();
-      audioManager.loadSounds().then(() => {
-        console.log("Звуки загружены");
-      });
-    }
-  }
-
-  // Модифицируем функцию воспроизведения фоновой музыки
+  // музыкальный контроллер
   const musicController = {
     currentMusic: null,
+    fadeInterval: null,
 
-    async playBackground() {
-      if (this.currentMusic) {
-        this.currentMusic.source.stop();
+    playBackground() {
+      try {
+        if (this.currentMusic) {
+          this.currentMusic.stop();
+        }
+
+        this.currentMusic = audioManager.play("background", {
+          loop: true,
+          volume: 0,
+        });
+
+        if (this.currentMusic) {
+          this.fadeIn();
+        }
+      } catch (e) {
+        console.warn("Ошибка воспроизведения фоновой музыки:", e);
       }
-      this.currentMusic = audioManager.play("background", {
-        loop: true,
-        volume: 0,
-      });
-      if (this.currentMusic) {
-        audioManager.fade(this.currentMusic.gainNode, 0, 0.5, 1.0);
-      }
+    },
+
+    fadeIn() {
+      clearInterval(this.fadeInterval);
+      let volume = 0;
+      this.fadeInterval = setInterval(() => {
+        if (volume < 0.5) {
+          volume = Math.min(0.5, volume + 0.05);
+          if (
+            this.currentMusic &&
+            typeof this.currentMusic.setVolume === "function"
+          ) {
+            this.currentMusic.setVolume(volume);
+          }
+        } else {
+          clearInterval(this.fadeInterval);
+        }
+      }, 100);
     },
 
     fadeOut() {
-      if (this.currentMusic) {
-        audioManager.fade(this.currentMusic.gainNode, 0.5, 0, 0.5);
-        setTimeout(() => {
-          if (this.currentMusic?.source) {
-            this.currentMusic.source.stop();
+      if (!this.currentMusic) return;
+
+      clearInterval(this.fadeInterval);
+      let volume =
+        this.currentMusic && typeof this.currentMusic.volume === "function"
+          ? this.currentMusic.volume()
+          : 0;
+
+      this.fadeInterval = setInterval(() => {
+        if (volume > 0) {
+          volume = Math.max(0, volume - 0.05);
+          if (
+            this.currentMusic &&
+            typeof this.currentMusic.setVolume === "function"
+          ) {
+            this.currentMusic.setVolume(volume);
           }
-        }, 500);
-      }
+        } else {
+          clearInterval(this.fadeInterval);
+          if (
+            this.currentMusic &&
+            typeof this.currentMusic.stop === "function"
+          ) {
+            this.currentMusic.stop();
+          }
+          this.currentMusic = null;
+        }
+      }, 50);
     },
   };
 
-  // Модифицируем функцию воспроизведения звука сбора монет
+  // функция инициализации звука
+  function initAudioOnUserInteraction() {
+    if (!audioManager.initialized) {
+      audioManager.init();
+
+      // Разблокировка звука для iOS
+      function unlockAudio() {
+        Object.values(audioManager.sounds).forEach((sound) => {
+          sound.play();
+          sound.stop();
+        });
+
+        document.removeEventListener("touchstart", unlockAudio);
+        document.removeEventListener("touchend", unlockAudio);
+        document.removeEventListener("click", unlockAudio);
+      }
+
+      document.addEventListener("touchstart", unlockAudio);
+      document.addEventListener("touchend", unlockAudio);
+      document.addEventListener("click", unlockAudio);
+    }
+  }
+
+  // ф воспроизведения звука сбора монет
   function playCollectSound() {
     audioManager.play("coin", { volume: 0.6 });
   }
 
-  // Модифицируем функцию воспроизведения звуков отсчета
+  // функция воспроизведения звуков отсчета
   function playCountdownSound(count) {
     const soundMap = {
       0: "countdown3",
@@ -207,7 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
     audioManager.play(soundMap[count], { volume: 0.7 });
   }
 
-  // Обновляем обработчики кнопок
+  // обработчики кнопок
   elements.playButton.addEventListener("click", () => {
     initAudioOnUserInteraction();
     startGame();

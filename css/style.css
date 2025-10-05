@@ -23,6 +23,94 @@ body {
     overflow: hidden;
     background-color: #111;
     border: 2px solid #fff;
+    z-index: 0;
+    outline: none;
+}
+
+/* Стили для счетчика космонавтов */
+.counter {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 24px;
+    z-index: 1;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
+    pointer-events: none;
+}
+
+@keyframes counter-death-blink {
+    0% {
+        transform: translateX(-50%) scale(1);
+        opacity: 1;
+    }
+
+    25% {
+        transform: translateX(-50%) scale(1.2);
+        opacity: 0.7;
+    }
+
+    50% {
+        transform: translateX(-50%) scale(1);
+        opacity: 0.5;
+    }
+
+    75% {
+        transform: translateX(-50%) scale(1.2);
+        opacity: 0.7;
+    }
+
+    100% {
+        transform: translateX(-50%) scale(1);
+        opacity: 1;
+    }
+}
+
+.counter.death-animation {
+    animation: counter-death-blink 0.4s infinite;
+}
+
+/* Стили для экрана отсчета */
+.countdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    z-index: 9999;
+}
+
+.countdown-container {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10000;
+}
+
+.countdown-number {
+    width: 150px;
+    height: 150px;
+    animation: scale-in 0.3s ease-out;
+}
+
+@keyframes scale-in {
+    from {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 /* Стили для корабля игрока */
@@ -104,25 +192,28 @@ body {
 }
 
 .menu-container,
-.game-over-screen {
+.game-over-screen,
+.countdown-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
-    /* Semi-transparent background */
+    top: -2px;
+    /* Компенсируем границу контейнера */
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    width: calc(100% + 4px);
+    /* Учитываем границу с обеих сторон */
+    height: calc(100% + 4px);
+    background-color: #000;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     color: white;
-    /* Text color */
-    z-index: 10;
-    /* Ensure it's on top */
-    transition: all 0.5s ease-in-out;
-    /* Add transition for animation */
+    z-index: 2;
+    transition: transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
     font-family: "Pixelify Sans";
+    will-change: transform;
+    border: none;
 }
 
 .menu-container button,
@@ -135,22 +226,38 @@ button {
     font-family: "Pixelify Sans";
 }
 
+.menu-container.hidden {
+    transform: translateY(-100%);
+}
+
 .game-over-screen {
-    top: -100%;
-    /* Начинаем за пределами экрана сверху */
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0);
-    /* Сделаем фон более непрозрачным */
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    color: white;
-    z-index: 10;
-    transition: top 1s ease-in-out;
-    /* Увеличим время анимации */
+    transform: translateY(-100%);
+    pointer-events: none;
+}
+
+.game-over-screen.visible {
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+.game-over-screen.hiding {
+    transform: translateY(100%);
+}
+
+.menu-container {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.menu-container.hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+}
+
+.game-over-screen.visible {
+    pointer-events: all;
+    transition-duration: 1s;
+    transform: translateY(0);
 }
 
 .game-container {

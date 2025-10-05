@@ -17,6 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
     finalScoreDisplay: document.getElementById("final-score"),
     highScoreDisplay: document.getElementById("high-score"),
     playAgainButton: document.getElementById("play-again-button"),
+    cosmonautCounter: document.getElementById("cosmonaut-count"),
   };
 
   // Проверка наличия всех элементов
@@ -31,6 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let obstacleSpawnTimeout = null;
   let itemSpawnTimeout = null;
   let score = 0;
+  let cosmonautsCollected = 0;
   let highScore = parseInt(localStorage.getItem("highScore")) || 0;
   elements.highScoreDisplay.textContent = highScore;
 
@@ -309,34 +311,20 @@ document.addEventListener("DOMContentLoaded", () => {
     setupCountdownContainer(container);
     setupCountdownOverlay(overlay);
 
-    elements.gameContainer.appendChild(overlay);
-    elements.gameContainer.appendChild(container);
+    document.body.appendChild(overlay);
+    document.body.appendChild(container);
 
     return { container, overlay };
   }
 
   // Настройка контейнера отсчёта
   function setupCountdownContainer(container) {
-    Object.assign(container.style, {
-      position: "absolute",
-      left: "50%",
-      top: "50%",
-      transform: "translate(-50%, -50%)",
-      zIndex: "1000",
-    });
+    container.classList.add("countdown-container");
   }
 
   // Настройка оверлея отсчёта
   function setupCountdownOverlay(overlay) {
-    Object.assign(overlay.style, {
-      position: "absolute",
-      left: "0",
-      top: "0",
-      width: "100%",
-      height: "100%",
-      backgroundColor: "black",
-      zIndex: "999",
-    });
+    overlay.classList.add("countdown-overlay");
   }
 
   // Обновление отображения отсчёта
@@ -367,12 +355,24 @@ document.addEventListener("DOMContentLoaded", () => {
   // Запуск игры
   function startGame() {
     resetGameState();
-    elements.menuContainer.style.top = "-100%";
+    elements.menuContainer.classList.add("hidden");
     elements.gameContainer.style.display = "block";
-    elements.gameOverScreen.style.top = "100%";
+
+    // Сначала убираем экран Game Over
+    elements.gameOverScreen.classList.add("hiding");
+    setTimeout(() => {
+      elements.gameOverScreen.style.display = "none";
+      elements.gameOverScreen.classList.remove("hiding");
+      elements.gameOverScreen.classList.remove("visible");
+    }, 1000);
+    cosmonautsCollected = 0;
+    elements.cosmonautCounter.textContent = "0";
+    const counter = document.getElementById("cosmonaut-counter");
+    counter.style.display = "block";
 
     playCountdown(() => {
       initializeGameSession();
+      counter.classList.add("visible");
     });
   }
 
@@ -397,6 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     clearAllIntervals();
     startGameLoops();
+    isGameStarting = false; // Сбрасываем флаг после полного запуска игры
   }
 
   // Очистка всех интервалов
@@ -436,12 +437,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const explosionImages = elements.gameContainer.querySelectorAll("img");
     explosionImages.forEach((img) => img.remove());
 
-    // Скрываем экран Game Over
-    elements.gameOverScreen.style.display = "none";
-    elements.player.style.display = "block";
+    // Скрываем экран Game Over с анимацией
+    elements.gameOverScreen.classList.add("hiding");
+    setTimeout(() => {
+      elements.gameOverScreen.style.display = "none";
+      elements.gameOverScreen.classList.remove("hiding");
+      elements.gameOverScreen.classList.remove("visible");
 
-    // Сразу запускаем отсчет
-    startGame();
+      // Сразу запускаем отсчет
+      startGame();
+    }, 1000);
+    elements.player.style.display = "block";
   }
 
   // Обновление позиции игрока
@@ -546,6 +552,8 @@ document.addEventListener("DOMContentLoaded", () => {
         endGame();
       } else {
         score++;
+        cosmonautsCollected++;
+        elements.cosmonautCounter.textContent = cosmonautsCollected;
         object.remove();
         // Воспроизводим звук монеты при сборе космонавта
         playCollectSound();
@@ -557,22 +565,32 @@ document.addEventListener("DOMContentLoaded", () => {
   function endGame() {
     clearAllIntervals();
     musicController.fadeOut();
+    const counter = document.getElementById("cosmonaut-counter");
+    counter.classList.add("death-animation");
     playDeathAnimation();
   }
 
   // Показ экрана Game Over
   function showGameOverScreen() {
+    const counter = document.getElementById("cosmonaut-counter");
+    counter.classList.remove("death-animation");
+    counter.style.display = "none";
+
     elements.gameOverScreen.style.display = "flex";
-    // Задержка перед появлением экрана Game Over
-    setTimeout(() => {
-      elements.gameOverScreen.style.top = "0%";
-      elements.finalScoreDisplay.textContent = score;
-      if (score > highScore) {
-        highScore = score;
-        localStorage.setItem("highScore", highScore);
-        elements.highScoreDisplay.textContent = highScore;
-      }
-    }, 1000); // 1 секунд задержки
+    elements.gameOverScreen.classList.remove("hiding");
+
+    // Даем время браузеру обработать display: flex
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        elements.gameOverScreen.classList.add("visible");
+        elements.finalScoreDisplay.textContent = score;
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem("highScore", highScore);
+          elements.highScoreDisplay.textContent = highScore;
+        }
+      });
+    });
   }
 
   // Анимация смерти
@@ -593,8 +611,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const animate = () => {
       if (animationFrame >= gameAssets.deathAnimation.length) {
-        explosionContainer.remove();
-        showGameOverScreen();
+        setTimeout(() => {
+          explosionContainer.remove();
+          showGameOverScreen();
+        }, 300);
         return;
       }
 
@@ -608,11 +628,9 @@ document.addEventListener("DOMContentLoaded", () => {
       explosionContainer.appendChild(img);
       animationFrame++;
 
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          requestAnimationFrame(animate);
-        }, 300);
-      });
+      setTimeout(() => {
+        requestAnimationFrame(animate);
+      }, 300);
     };
 
     elements.gameContainer.appendChild(explosionContainer);
@@ -697,34 +715,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Настройка управления
   function setupControls() {
-    elements.gameContainer.tabIndex = 0;
-    elements.gameContainer.focus();
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        playerSettings.movingLeft = true;
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        playerSettings.movingRight = true;
+      }
+    });
 
-    elements.gameContainer.addEventListener(
-      "keydown",
-      (e) => {
-        if (e.target === elements.gameContainer) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (e.key === "ArrowLeft") playerSettings.movingLeft = true;
-          if (e.key === "ArrowRight") playerSettings.movingRight = true;
-        }
-      },
-      { capture: true }
-    );
-
-    elements.gameContainer.addEventListener(
-      "keyup",
-      (e) => {
-        if (e.target === elements.gameContainer) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (e.key === "ArrowLeft") playerSettings.movingLeft = false;
-          if (e.key === "ArrowRight") playerSettings.movingRight = false;
-        }
-      },
-      { capture: true }
-    );
+    document.addEventListener("keyup", (e) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        playerSettings.movingLeft = false;
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        playerSettings.movingRight = false;
+      }
+    });
 
     elements.player.addEventListener(
       "touchstart",
@@ -745,8 +756,6 @@ document.addEventListener("DOMContentLoaded", () => {
           const deltaX = touchX - playerSettings.touchStartX;
           const containerWidth = elements.gameContainer.offsetWidth;
           const playerWidth = elements.player.offsetWidth;
-
-          // Рассчитываем новую позицию с учетом границ
           const newX = playerSettings.x + deltaX;
           playerSettings.x = Math.max(
             0,

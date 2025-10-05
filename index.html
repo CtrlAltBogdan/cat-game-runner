@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Space Dodger</title>
-    <link rel="shortcut icon" href="./img/asteroid.svg" type="image/x-icon">
+    <link rel="shortcut icon" href="./img/asteroid.svg" type="image/x-icon" />
     <link rel="stylesheet" href="./css/style.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
     <script src="./js/preloader.js"></script>
@@ -22,8 +22,12 @@
 
     <!-- Игровое поле, скрыто по умолчанию -->
     <div class="game-container" id="game-container" style="display: none">
-      <!-- Игрок (зеленый квадрат), который будет управляться через скрипт -->
+      <!-- Игрок, который будет управляться через скрипт -->
       <div id="player" class="space"></div>
+      <!-- Счетчик собранных космонавтов -->
+      <div id="cosmonaut-counter" class="counter">
+        Score: <span id="cosmonaut-count">0</span>
+      </div>
     </div>
 
     <!-- Экран окончания игры, также скрыт по умолчанию -->

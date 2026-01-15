@@ -777,16 +777,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Инициализация игры
-  elements.playButton.addEventListener("click", () => {
-    initAudioOnUserInteraction();
-    startGame();
-  });
-  elements.playAgainButton.addEventListener("click", () => {
-    initAudioOnUserInteraction();
-    resetGame();
-  });
-
   // Убедимся, что игра начинается только после загрузки всех ресурсов
   const loadingScreen = document.getElementById("loading-screen");
   const menuContainer = document.getElementById("menu-container");
